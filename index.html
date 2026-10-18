@@ -161,7 +161,7 @@ const mon=d=>{const x=new Date(d);x.setDate(x.getDate()-((x.getDay()+6)%7));retu
 let sb,me=null,cals=[],events=[],hid=new Set(),view="m",cur=new Date(),edit=null,infoId=null,ncol=COL[1],mode="in",made=false,tmr=null;
 const configured=!SUPABASE_URL.startsWith("COLLE");
 const err=m=>{$("er").textContent=m};
-const mail=u=>u.trim().toLowerCase()+"@agenda-losange.app";
+const mail=u=>u.trim().toLowerCase()+".agendacm@gmail.com";
 
 /* ---------- Compte ---------- */
 function setMode(m){mode=m;$("ti1").className=m=="in"?"on":"";$("ti2").className=m=="up"?"on":"";
