@@ -2,6 +2,11 @@
 <html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#6b2fa0">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Agenda">
 <title>Agenda Chambon Maisse</title>
 <style>
 :root{--bg:#e8e9eb;--card:#ffffffe0;--solid:#fff;--ink:#2b3340;--mut:#7a808b;--line:#e1e3e7;--wood:#c68b59;--wood2:#a8703f;--pur:#6b2fa0;--pur2:#8d4fc4;--gry:#c9cbd0;--sel:#efe3f8;--sh:0 10px 34px #2b33401f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -121,6 +126,7 @@ aside.open{transform:none}#bg{display:grid}
 <input id="a" placeholder="Titre" required>
 <input id="b" type="date" required><input id="t" type="time">
 <select id="sc"></select>
+<small style="color:var(--mut)">Couleur</small><div class="sw" id="ec"></div>
 <div class="r"><button type="button" id="del" class="hide">Supprimer</button><button type="button" class="x">Annuler</button><button class="pri">Enregistrer</button></div>
 </form></div>
 
@@ -158,7 +164,7 @@ const $=i=>document.getElementById(i);
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const iso=d=>d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
 const mon=d=>{const x=new Date(d);x.setDate(x.getDate()-((x.getDay()+6)%7));return x};
-let sb,me=null,cals=[],events=[],hid=new Set(),view="m",cur=new Date(),edit=null,infoId=null,ncol=COL[1],mode="in",made=false,tmr=null;
+let sb,me=null,cals=[],events=[],hid=new Set(),view="m",cur=new Date(),edit=null,infoId=null,ncol=COL[1],ecol="#a8703f",mode="in",made=false,tmr=null;
 const configured=!SUPABASE_URL.startsWith("COLLE");
 const err=m=>{$("er").textContent=m};
 const mail=u=>u.trim().toLowerCase()+".agendacm@gmail.com";
@@ -195,7 +201,7 @@ async function start(user){
 async function loadAll(){
  const a=await sb.from("calendars").select("id,name,color,owner,invite_code,calendar_members(user_id)").order("created_at");
  cals=a.data||[];const ids=cals.map(c=>c.id);
- const b=ids.length?await sb.from("events").select("id,calendar_id,title,day,time").in("calendar_id",ids):{data:[]};
+ const b=ids.length?await sb.from("events").select("id,calendar_id,title,day,time,color").in("calendar_id",ids):{data:[]};
  events=b.data||[];render();renderCals();
 }
 const colOf=id=>(cals.find(c=>c.id==id)||{}).color||COL[0];
@@ -212,7 +218,7 @@ function render(){
   const d=new Date(start);d.setDate(d.getDate()+i);const k=iso(d);
   const es=ev.filter(e=>e.day==k).sort((a,b)=>(a.time||"").localeCompare(b.time||""));const lim=view=="m"?3:99;
   h+=`<div class="c${d.getMonth()!=cur.getMonth()&&view=="m"?" o":""}" data-d="${k}"><span class="n${k==td?" t":""}">${d.getDate()}</span>`+
-  es.slice(0,lim).map(e=>`<span class="e" data-id="${e.id}" style="background:${colOf(e.calendar_id)}">${e.time?esc(e.time)+" · ":""}${esc(e.title)}</span>`).join("")+
+  es.slice(0,lim).map(e=>`<span class="e" data-id="${e.id}" style="background:${e.color||colOf(e.calendar_id)}">${e.time?esc(e.time)+" · ":""}${esc(e.title)}</span>`).join("")+
   (es.length>lim?`<div class="more">+${es.length-lim} autres</div>`:"")+`</div>`;
  }
  $("mn").innerHTML=`<div class="grid ${view=="w"?"w":""}">${h}</div>`;
@@ -234,16 +240,20 @@ function openEv(k,e){
  edit=e||null;$("ft").textContent=e?"Modifier l’événement":"Nouvel événement";
  $("a").value=e?e.title:"";$("b").value=e?e.day:k;$("t").value=e&&e.time||"";
  $("sc").innerHTML=cals.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join("");
- $("sc").value=e?e.calendar_id:cals[0].id;$("del").classList.toggle("hide",!e);$("ov").classList.add("s");
+ $("sc").value=e?e.calendar_id:cals[0].id;ecol=(e&&e.color)||"#a8703f";ecSw();$("del").classList.toggle("hide",!e);$("ov").classList.add("s");
 }
 $("mn").onclick=e=>{const ee=e.target.closest(".e");
  if(ee){openEv(null,events.find(x=>x.id==ee.dataset.id));return}
  const c=e.target.closest(".c");if(c&&cals.length)openEv(c.dataset.d)};
 $("fm").onsubmit=async e=>{e.preventDefault();
- const o={title:$("a").value,day:$("b").value,time:$("t").value||null,calendar_id:$("sc").value};
+ const o={title:$("a").value,day:$("b").value,time:$("t").value||null,calendar_id:$("sc").value,color:ecol};
  if(edit)await sb.from("events").update(o).eq("id",edit.id);else await sb.from("events").insert({...o,created_by:me.id});
  cls();loadAll()};
 $("del").onclick=async()=>{await sb.from("events").delete().eq("id",edit.id);cls();loadAll()};
+
+const EC=["#a8703f","#6b2fa0"];
+function ecSw(){$("ec").innerHTML=EC.map(c=>`<i data-c="${c}" class="${c==ecol?"on":""}" style="background:${c}"></i>`).join("")}
+$("ec").onclick=e=>{if(e.target.dataset.c){ecol=e.target.dataset.c;ecSw()}};
 
 /* ---------- Agendas, codes, membres ---------- */
 function swatches(){$("sw").innerHTML=COL.map(c=>`<i data-c="${c}" class="${c==ncol?"on":""}" style="background:${c}"></i>`).join("")}
